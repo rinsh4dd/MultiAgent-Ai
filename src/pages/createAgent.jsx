@@ -14,7 +14,8 @@ import {
   Fingerprint,
 } from "lucide-react";
 import { useToast } from "../components/Toast";
-pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+// pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 const SectionHeader = ({ icon: Icon, title }) => (
   <div className="flex items-center gap-3 mb-6 pb-2 border-b border-neutral-800">
     <Icon size={16} strokeWidth={1.5} className="text-neutral-500" />
