@@ -73,21 +73,12 @@ import * as pdfjsLib from "pdfjs-dist";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as mammoth from "mammoth"; // For Word Docs
 import * as XLSX from "xlsx";       // For Excel Sheets
-
-// Fix PDF Worker for Vite
 import pdfWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
-
-// ✅ USE THIS MODEL: It exists in your account and has better limits than 'latest'
-// If 'gemini-flash-lite-latest' is too busy, try 'gemini-flash-latest'
 const MODEL_NAME = "gemini-flash-lite-latest";
-
-// Helper: Wait function for retries
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Helper: Convert File to Base64
 const fileToGenerativePart = async (file) => {
   const base64EncodedDataPromise = new Promise((resolve) => {
     const reader = new FileReader();
