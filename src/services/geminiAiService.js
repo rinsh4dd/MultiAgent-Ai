@@ -27,7 +27,7 @@ KNOWLEDGE BASE:
 ${knowledgeBase}
 
 RULES:
-- Prefer the knowledge base
+- Prefer the knowledge base and dont expose like this is my knowledge base or knowledge base word
 - If missing, say you don’t know
 - Be concise
 `;

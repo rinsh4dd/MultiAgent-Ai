@@ -202,7 +202,7 @@ export default function CreateAgent() {
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  placeholder="e.g. Nexus"
+                  placeholder="e.g. Zara"
                   icon={Bot}
                 />
 
@@ -212,7 +212,7 @@ export default function CreateAgent() {
                   name="age"
                   value={formData.age}
                   onChange={handleInputChange}
-                  placeholder="e.g. v2.5 / 3 Years"
+                  placeholder="e.g. 25 "
                 />
 
                 <div className="md:col-span-2">
@@ -221,7 +221,7 @@ export default function CreateAgent() {
                     name="role"
                     value={formData.role}
                     onChange={handleInputChange}
-                    placeholder="e.g. Financial Forecaster"
+                    placeholder="e.g. Data Analyst"
                     icon={User}
                   />
                 </div>
@@ -231,7 +231,7 @@ export default function CreateAgent() {
             <section>
               <div className="group space-y-2">
                 <label className="text-[10px] font-medium text-neutral-600 uppercase tracking-wider ml-1">
-                  BEHAVIOUR & DIRECTIVES
+                   MODEL BEHAVIOUR 
                 </label>
                 <textarea
                   name="behaviour"
