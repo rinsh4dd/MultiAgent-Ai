@@ -3,130 +3,102 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 
-async function getGeminiResponse(userMessage, agent, chatHistory = []) {
-  try {
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+// 🚀 UPDATED: Prioritize models found in your logs
+const MODELS_TO_TRY = [
+  "gemini-2.0-flash",       // Stable & Fast (Try this first)
+  "gemini-2.5-flash",       // Bleeding Edge
+  "gemini-2.0-flash-lite",  // Lightweight fallback
+  "gemini-pro"              // Oldest fallback
+];
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash-lite",
-    });
+async function getGeminiResponse(userMessage, agent, chatHistory = [], imageBase64 = null) {
+  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  
+  let lastError = null;
 
-    const knowledgeBase = agent.knowledgeBase || "No document provided.";
+  // 🔄 AUTO-DISCOVERY LOOP
+  for (const modelName of MODELS_TO_TRY) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
 
-    const history = chatHistory.map((msg) => ({
-      role: msg.role === "assistant" ? "model" : "user",
-      parts: [{ text: msg.content || msg.text }],
-    }));
+      const knowledgeBase = agent.knowledgeBase || "No document provided.";
 
-    const systemInstruction = `
-You are an AI Agent named "${agent.name}".
-Role: ${agent.role || "Assistant"}
-Personality: ${agent.behaviour}
+      const history = chatHistory.map((msg) => ({
+        role: msg.role === "assistant" ? "model" : "user",
+        parts: [{ text: msg.content || msg.text || " " }],
+      }));
 
-KNOWLEDGE BASE:
-${knowledgeBase}
+      const systemInstruction = `
+        You are ${agent.name}, a ${agent.role || "Assistant"}.
+        Personality: ${agent.behaviour || "Helpful"}.
+        KB: ${knowledgeBase}.
+        RULES: Prefer KB. Be concise.
+      `;
 
-RULES:
-- Prefer the knowledge base and dont expose like this is my knowledge base or knowledge base word
-- If missing, say you don't know
-- Be concise
-`;
+      const chat = model.startChat({
+        history: [
+          { role: "user", parts: [{ text: systemInstruction }] },
+          { role: "model", parts: [{ text: "Understood." }] },
+          ...history,
+        ],
+      });
 
-    const chat = model.startChat({
-      history: [
-        { role: "user", parts: [{ text: systemInstruction }] },
-        { role: "model", parts: [{ text: "Understood." }] },
-        ...history,
-      ],
-      generationConfig: { maxOutputTokens: 800 },
-    });
+      // Build Request
+      let parts = [];
+      if (userMessage && userMessage.trim() !== "") parts.push({ text: userMessage });
+      
+      if (imageBase64) {
+        parts.push({
+          inlineData: {
+            mimeType: "image/jpeg",
+            data: imageBase64
+          }
+        });
+      }
 
-    const result = await chat.sendMessage(userMessage);
-    const response = result?.response;
+      if (parts.length === 0) throw new Error("EMPTY_REQUEST");
 
-    const text = response?.text?.();
-    const feedback = response?.promptFeedback;
-    const candidate = response?.candidates?.[0];
+      const result = await chat.sendMessage(parts);
+      const text = result.response.text();
 
-    if (
-      !text ||
-      text.trim() === "" ||
-      feedback?.blockReason ||
-      candidate?.finishReason === "SAFETY"
-    ) {
-      throw new Error("GEMINI_BLOCKED_OR_EMPTY");
+      if (!text) throw new Error("EMPTY_RESPONSE");
+
+      return text; 
+
+    } catch (err) {
+      lastError = err;
+      // If 404, loop to next model.
     }
-
-    return text;
-  } catch (err) {
-    const msg = err?.message || "";
-
-    if (
-      msg.includes("429") ||
-      msg.includes("RESOURCE_EXHAUSTED") ||
-      msg.includes("quota") ||
-      msg.includes("GEMINI_")
-    ) {
-      throw new Error("GEMINI_UNAVAILABLE");
-    }
-
-    throw err;
   }
+
+  console.error("ALL MODELS FAILED. Switching to Groq.");
+  throw lastError; 
 }
 
+// Fallback to Groq
 async function getGroqResponse(userMessage, agent, chatHistory = []) {
-  const systemPrompt = `
-You are an AI Agent named "${agent.name}".
-Role: ${agent.role || "Assistant"}
-Personality: ${agent.behaviour}
-
-KNOWLEDGE BASE:
-${agent.knowledgeBase || "No document provided."}
-
-RULES:
-- Be concise
-- Say when unsure
-`;
-
+  const systemPrompt = `You are ${agent.name}. Role: ${agent.role}. Personality: ${agent.behaviour}. KB: ${agent.knowledgeBase}`;
   const messages = [
     { role: "system", content: systemPrompt },
     ...chatHistory,
-    { role: "user", content: userMessage },
+    { role: "user", content: userMessage || "(Image ignored)" }, 
   ];
 
-  const res = await fetch(
-    "https://api.groq.com/openai/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages,
-        temperature: 0.7,
-      }),
-    }
-  );
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "llama-3.1-8b-instant", messages, temperature: 0.7 }),
+  });
 
-  if (!res.ok) {
-    throw new Error("GROQ_FAILED");
-  }
-
+  if (!res.ok) throw new Error("GROQ_FAILED");
   const data = await res.json();
   return data.choices[0].message.content;
 }
 
-export async function getAgentResponse(
-  userMessage,
-  agent,
-  chatHistory = []
-) {
+export async function getAgentResponse(userMessage, agent, chatHistory = [], audioBase64 = null, imageBase64 = null) {
   try {
-    return await getGeminiResponse(userMessage, agent, chatHistory);
+    return await getGeminiResponse(userMessage, agent, chatHistory, imageBase64);
   } catch (err) {
-    console.warn("⚠️ Gemini unavailable → switching to Groq");
     return await getGroqResponse(userMessage, agent, chatHistory);
   }
 }

@@ -17,6 +17,7 @@
     "pdfjs-dist": "^5.4.530",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-media-recorder": "^1.7.2",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
