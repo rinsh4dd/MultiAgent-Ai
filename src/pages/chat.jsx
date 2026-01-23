@@ -4,40 +4,30 @@ import { collection, getDocs } from "firebase/firestore";
 import { getAgentResponse } from "../services/geminiAiService";
 import { 
   Send, Bot, Sparkles, ChevronDown, Cpu, Circle, 
-  Mic, Image as ImageIcon, X 
+  Mic, Image as ImageIcon, X, Share2 
 } from "lucide-react";
 
-// --- 1. SPEECH HOOK (Live Transcription) ---
+// --- SPEECH HOOK ---
 const useSpeechToText = () => {
   const [isListening, setIsListening] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState("");
   const recognitionRef = useRef(null);
 
   useEffect(() => {
-    // Basic check for browser support
     if (!("webkitSpeechRecognition" in window)) return;
-
     const recognition = new window.webkitSpeechRecognition();
     recognition.continuous = true;
-    recognition.interimResults = true; // Key for "Live" typing
+    recognition.interimResults = true;
     recognition.lang = "en-US";
 
     recognition.onresult = (event) => {
       let finalString = "";
       let interimString = "";
-
       for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalString += event.results[i][0].transcript;
-        } else {
-          interimString += event.results[i][0].transcript;
-        }
+        if (event.results[i].isFinal) finalString += event.results[i][0].transcript;
+        else interimString += event.results[i][0].transcript;
       }
-      
-      // Update transcript state with current session text
-      if (finalString || interimString) {
-        setLiveTranscript(finalString + interimString);
-      }
+      if (finalString || interimString) setLiveTranscript(finalString + interimString);
     };
 
     recognition.onend = () => setIsListening(false);
@@ -96,24 +86,21 @@ export default function Chat() {
   const [agents, setAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [messages, setMessages] = useState([]);
-  
-  // Input State
   const [input, setInput] = useState("");
-  const [baseInput, setBaseInput] = useState(""); // Snapshot of input BEFORE recording
-  
+  const [baseInput, setBaseInput] = useState(""); 
   const [loading, setLoading] = useState(false);
   const [showAgentMenu, setShowAgentMenu] = useState(false);
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null); // Ref for dynamic height
 
   // Media
   const [imageBase64, setImageBase64] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
 
-  // Speech Hook
+  // Hooks
   const { isListening, liveTranscript, startListening, stopListening } = useSpeechToText();
 
-  // Load Agents
   useEffect(() => {
     const fetchAgents = async () => {
       const snap = await getDocs(collection(db, "agents"));
@@ -124,14 +111,18 @@ export default function Chat() {
     fetchAgents();
   }, []);
 
-  // Scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // --- LIVE SYNC LOGIC ---
-  // When recording starts, we freeze "baseInput".
-  // As you speak, Input = Base + New Speech.
+  // --- AUTO-RESIZE INPUT LOGIC ---
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto"; // Reset to calculate new height
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; // Set to scrollHeight
+    }
+  }, [input]);
+
   useEffect(() => {
     if (isListening) {
       const separator = baseInput && liveTranscript ? " " : "";
@@ -142,10 +133,22 @@ export default function Chat() {
   const handleMicClick = () => {
     if (isListening) {
       stopListening();
-      setBaseInput(input); // Save the result
+      setBaseInput(input);
     } else {
-      setBaseInput(input); // Freeze current text
+      setBaseInput(input);
       startListening();
+    }
+  };
+
+  const handleShare = async () => {
+    const lastMessage = [...messages].reverse().find(m => m.role === "assistant");
+    if (lastMessage && navigator.share) {
+      try {
+        await navigator.share({ title: `Chat with ${selectedAgent?.name || 'AI'}`, text: lastMessage.content });
+      } catch (err) { console.log("Share cancelled"); }
+    } else if (lastMessage) {
+        navigator.clipboard.writeText(lastMessage.content);
+        alert("Copied to clipboard!");
     }
   };
 
@@ -164,8 +167,7 @@ export default function Chat() {
   const handleSend = async () => {
     if (loading) return;
     if ((!input.trim() && !imageBase64) || !selectedAgent) return;
-
-    if (isListening) stopListening(); // Stop mic if active
+    if (isListening) stopListening();
 
     const userText = input;
     setInput(""); 
@@ -173,15 +175,12 @@ export default function Chat() {
     setImageBase64(null);
     setImagePreview(null);
     
-    const newUserMessage = { 
-      role: "user", 
-      content: userText,
-      imagePreview: imagePreview 
-    };
-    
+    // Reset height immediately after send
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+
+    const newUserMessage = { role: "user", content: userText, imagePreview: imagePreview };
     const updatedMessages = [...messages, newUserMessage];
-    const MAX_CONTEXT = 5;
-    const trimmedMessages = updatedMessages.slice(-MAX_CONTEXT);
+    const trimmedMessages = updatedMessages.slice(-5);
 
     setMessages(updatedMessages);
     setLoading(true);
@@ -194,7 +193,6 @@ export default function Chat() {
         null, 
         imageBase64
       );
-
       setMessages((prev) => [...prev, { role: "assistant", content: response }]);
     } catch (e) {
       setMessages((prev) => [...prev, { role: "system", content: "Error: " + e.message }]);
@@ -205,8 +203,6 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-black text-neutral-200 font-sans w-full max-w-5xl mx-auto relative">
-      
-      {/* VIBRATION CSS (Simple Shake) */}
       <style>{`
         @keyframes vibrate {
           0% { transform: translate(0); }
@@ -215,9 +211,7 @@ export default function Chat() {
           75% { transform: translate(2px, -2px); }
           100% { transform: translate(0); }
         }
-        .animate-vibrate {
-          animation: vibrate 0.2s linear infinite;
-        }
+        .animate-vibrate { animation: vibrate 0.2s linear infinite; }
       `}</style>
 
       {/* 1. CHAT STREAM */}
@@ -230,9 +224,7 @@ export default function Chat() {
             </div>
             <div className="text-center space-y-2">
               <p className="font-light text-sm uppercase tracking-[0.3em]">System Ready</p>
-              <p className="text-xs font-mono text-neutral-500">
-                {selectedAgent ? `Connected to: ${selectedAgent.name}` : "Select an agent"}
-              </p>
+              <p className="text-xs font-mono text-neutral-500">{selectedAgent ? `Connected to: ${selectedAgent.name}` : "Select an agent"}</p>
             </div>
           </div>
         ) : (
@@ -268,8 +260,6 @@ export default function Chat() {
       {/* 2. INPUT AREA */}
       <div className="p-6 bg-black sticky bottom-0 z-30">
         <div className="relative max-w-3xl mx-auto">
-          
-          {/* Image Preview */}
           {imagePreview && (
             <div className="absolute bottom-full left-0 mb-2 relative group">
               <img src={imagePreview} alt="Preview" className="h-16 w-16 object-cover rounded-lg border border-neutral-700" />
@@ -279,7 +269,6 @@ export default function Chat() {
             </div>
           )}
 
-          {/* Agent Menu */}
           {showAgentMenu && (
             <div className="absolute bottom-full left-0 mb-4 w-64 bg-neutral-950 border border-neutral-800 rounded-lg overflow-hidden shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
               <div className="px-3 py-2 border-b border-neutral-900">
@@ -287,11 +276,7 @@ export default function Chat() {
               </div>
               <div className="max-h-48 overflow-y-auto custom-scrollbar p-1">
                 {agents.map((agent) => (
-                  <button
-                    key={agent.id}
-                    onClick={() => { setSelectedAgent(agent); setShowAgentMenu(false); setMessages([]); }}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md transition-all text-left ${selectedAgent?.id === agent.id ? "bg-neutral-900" : "hover:bg-neutral-900/50"}`}
-                  >
+                  <button key={agent.id} onClick={() => { setSelectedAgent(agent); setShowAgentMenu(false); setMessages([]); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md transition-all text-left ${selectedAgent?.id === agent.id ? "bg-neutral-900" : "hover:bg-neutral-900/50"}`}>
                     <Circle size={6} className={selectedAgent?.id === agent.id ? "fill-emerald-500 text-emerald-500" : "text-neutral-700"} />
                     <div>
                       <p className="text-xs font-medium text-neutral-200">{agent.name}</p>
@@ -304,54 +289,58 @@ export default function Chat() {
           )}
 
           <div className={`
-             flex items-center gap-2 bg-neutral-950 border rounded-xl p-1.5 pl-2 shadow-2xl transition-all duration-300
+             flex items-end gap-2 bg-neutral-950 border rounded-xl p-1.5 pl-2 shadow-2xl transition-all duration-300
              ${isListening ? "border-emerald-500/50 ring-1 ring-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.1)]" : "border-neutral-800"}
           `}>
             
-            <AgentBadge agent={selectedAgent} isOpen={showAgentMenu} onClick={() => setShowAgentMenu(!showAgentMenu)} />
+            <div className="pb-2"> {/* Align badge to bottom if text grows */}
+               <AgentBadge agent={selectedAgent} isOpen={showAgentMenu} onClick={() => setShowAgentMenu(!showAgentMenu)} />
+            </div>
             
-            <input
-              className="flex-1 bg-transparent text-white text-sm font-light px-2 py-2 outline-none placeholder:text-neutral-700"
-              placeholder={isListening ? "Listening..." : "Enter command..."}
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              className="flex-1 bg-transparent text-white text-sm font-light px-2 py-3 outline-none placeholder:text-neutral-700 resize-none max-h-32 min-h-[40px] overflow-y-auto scrollbar-hide"
+              placeholder={isListening ? "Listening..." : "Message..."}
               value={input}
               onChange={(e) => {
-                 if (isListening) stopListening(); // Stop if user types
+                 if (isListening) stopListening();
                  setInput(e.target.value);
                  setBaseInput(e.target.value);
               }}
-              onKeyDown={(e) => { if (e.key === "Enter" && !loading) handleSend(); }}
+              onKeyDown={(e) => { 
+                if (e.key === "Enter" && !e.shiftKey && !loading) {
+                    e.preventDefault(); // Prevent default new line
+                    handleSend(); 
+                }
+              }}
               disabled={loading} 
-              autoComplete="off"
             />
 
-            {/* BUTTONS */}
-            <div className="flex items-center gap-1 pr-1">
+            {/* ACTION BUTTONS */}
+            <div className="flex items-center gap-1 pr-1 shrink-0 pb-1"> {/* Align buttons to bottom */}
               
               <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
+              
               <button onClick={() => fileInputRef.current.click()} className={`p-2 rounded-lg transition-colors hover:bg-neutral-800 ${imageBase64 ? "text-emerald-500" : "text-neutral-500"}`} title="Upload Image">
                 <ImageIcon size={18} strokeWidth={1.5} />
               </button>
 
-              {/* LIVE DICTATION MIC */}
+              <button onClick={handleShare} className="p-2 rounded-lg transition-colors hover:bg-neutral-800 text-neutral-500" title="Share Last Response">
+                <Share2 size={18} strokeWidth={1.5} />
+              </button>
+
               <button 
                 onClick={handleMicClick} 
                 className={`
                   p-2 rounded-lg transition-all duration-200 flex items-center justify-center w-10 h-10
-                  ${isListening 
-                    ? "bg-red-500/20 text-red-500 animate-vibrate shadow-[0_0_15px_rgba(239,68,68,0.4)]" 
-                    : "hover:bg-neutral-800 text-neutral-500"
-                  }
+                  ${isListening ? "bg-red-500/20 text-red-500 animate-vibrate" : "hover:bg-neutral-800 text-neutral-500"}
                 `}
-                title="Dictate"
               >
                 <Mic size={18} strokeWidth={isListening ? 2.5 : 1.5} />
               </button>
 
-              <button
-                onClick={handleSend}
-                disabled={(!input.trim() && !imageBase64) || loading}
-                className={`p-2 rounded-lg transition-all duration-300 ml-1 ${(!input.trim() && !imageBase64) || loading ? "opacity-20 cursor-not-allowed" : "bg-white text-black hover:scale-105"}`}
-              >
+              <button onClick={handleSend} disabled={(!input.trim() && !imageBase64) || loading} className={`p-2 rounded-lg transition-all duration-300 ml-1 ${(!input.trim() && !imageBase64) || loading ? "opacity-20 cursor-not-allowed" : "bg-white text-black hover:scale-105"}`}>
                 <Send size={16} strokeWidth={2} />
               </button>
             </div>
