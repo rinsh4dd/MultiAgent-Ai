@@ -1,4 +1,4 @@
-const API_KEY = "AIzaSyDWquMdr-zfpKLkL-Pzy27gTAfK5JQ7wP4";
+const API_KEY = "";
 const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
 
 async function listGeminiModels() {

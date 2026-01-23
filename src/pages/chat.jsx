@@ -68,14 +68,15 @@ const FormattedMessage = ({ text }) => {
   );
 };
 
+// --- RESPONSIVE AGENT BADGE ---
 const AgentBadge = ({ agent, onClick, isOpen }) => (
-  <button onClick={onClick} className="group flex items-center gap-2 pr-3 pl-2 py-1.5 rounded-md hover:bg-neutral-900 transition-all border-r border-neutral-800">
+  <button onClick={onClick} className="group flex items-center gap-2 pr-2 pl-2 py-1.5 rounded-md hover:bg-neutral-900 transition-all border-r border-neutral-800 shrink-0">
     <div className="relative">
-      <Bot size={16} strokeWidth={1.5} className="text-neutral-500 group-hover:text-white transition-colors" />
+      <Bot size={18} strokeWidth={1.5} className="text-neutral-500 group-hover:text-white transition-colors" />
       <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
     </div>
-    <div className="flex flex-col items-start">
-      <span className="text-[10px] font-medium uppercase tracking-widest text-neutral-300 group-hover:text-white">{agent ? agent.name : "Select Agent"}</span>
+    <div className="flex-col items-start hidden sm:flex"> 
+      <span className="text-[10px] font-medium uppercase tracking-widest text-neutral-300 group-hover:text-white">{agent ? agent.name : "Select"}</span>
     </div>
     <ChevronDown size={12} className={`text-neutral-600 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
   </button>
@@ -91,7 +92,7 @@ export default function Chat() {
   const [loading, setLoading] = useState(false);
   const [showAgentMenu, setShowAgentMenu] = useState(false);
   const messagesEndRef = useRef(null);
-  const textareaRef = useRef(null); // Ref for dynamic height
+  const textareaRef = useRef(null); 
 
   // Media
   const [imageBase64, setImageBase64] = useState(null);
@@ -100,6 +101,9 @@ export default function Chat() {
 
   // Hooks
   const { isListening, liveTranscript, startListening, stopListening } = useSpeechToText();
+
+  // State to track if chat has started (for centering logic)
+  const isChatStarted = messages.length > 0;
 
   useEffect(() => {
     const fetchAgents = async () => {
@@ -115,11 +119,11 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // --- AUTO-RESIZE INPUT LOGIC ---
+  // Auto-Resize Input
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = "auto"; // Reset to calculate new height
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; // Set to scrollHeight
+      textareaRef.current.style.height = "auto"; 
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; 
     }
   }, [input]);
 
@@ -175,7 +179,7 @@ export default function Chat() {
     setImageBase64(null);
     setImagePreview(null);
     
-    // Reset height immediately after send
+    // Reset height immediately
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
     const newUserMessage = { role: "user", content: userText, imagePreview: imagePreview };
@@ -215,20 +219,11 @@ export default function Chat() {
       `}</style>
 
       {/* 1. CHAT STREAM */}
-      <div className="flex-1 overflow-y-auto px-6 py-8 space-y-10 no-scrollbar">
-        {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center gap-6 opacity-30 select-none">
-            <div className="relative">
-              <Sparkles size={48} strokeWidth={1} />
-              <div className="absolute inset-0 bg-white/20 blur-xl rounded-full"></div>
-            </div>
-            <div className="text-center space-y-2">
-              <p className="font-light text-sm uppercase tracking-[0.3em]">System Ready</p>
-              <p className="text-xs font-mono text-neutral-500">{selectedAgent ? `Connected to: ${selectedAgent.name}` : "Select an agent"}</p>
-            </div>
-          </div>
-        ) : (
-          messages.map((m, i) => (
+      <div className={`
+        flex-1 overflow-y-auto px-4 md:px-6 py-8 space-y-10 no-scrollbar transition-all duration-500
+        ${isChatStarted ? "opacity-100" : "opacity-0"} 
+      `}>
+        {messages.map((m, i) => (
             <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"} gap-2`}>
               <span className="text-[10px] uppercase tracking-widest text-neutral-600 font-mono px-1">
                 {m.role === "user" ? "You" : selectedAgent?.name || "Agent"}
@@ -246,8 +241,8 @@ export default function Chat() {
                 {m.role === "user" || m.role === "system" ? m.content : <FormattedMessage text={m.content} />}
               </div>
             </div>
-          ))
-        )}
+          ))}
+
         {loading && (
           <div className="flex items-center gap-3 pl-1 animate-pulse opacity-60">
             <Cpu size={14} className="text-emerald-500" />
@@ -257,9 +252,27 @@ export default function Chat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 2. INPUT AREA */}
-      <div className="p-6 bg-black sticky bottom-0 z-30">
-        <div className="relative max-w-3xl mx-auto">
+      {/* 2. DYNAMIC INPUT AREA (Centered when empty, Bottom when chatting) */}
+      <div className={`
+        absolute left-0 right-0 p-4 transition-all duration-700 ease-in-out flex flex-col items-center justify-center z-30
+        ${isChatStarted ? "bottom-0 bg-transparent" : "top-0 bottom-0 bg-black"}
+      `}>
+        
+        {/* Welcome Message (Only visible when centered/empty) */}
+        {!isChatStarted && (
+           <div className="text-center space-y-4 mb-8 animate-in fade-in zoom-in duration-700">
+             <div className="relative inline-block">
+                <Sparkles size={48} strokeWidth={1} className="text-white mx-auto" />
+                <div className="absolute inset-0 bg-white/20 blur-xl rounded-full animate-pulse"></div>
+             </div>
+             <p className="font-light text-2xl text-transparent bg-clip-text bg-gradient-to-r from-neutral-200 to-neutral-500">
+               How can I help you today?
+             </p>
+           </div>
+        )}
+
+        {/* INPUT CONTAINER */}
+        <div className="relative w-full max-w-3xl mx-auto">
           {imagePreview && (
             <div className="absolute bottom-full left-0 mb-2 relative group">
               <img src={imagePreview} alt="Preview" className="h-16 w-16 object-cover rounded-lg border border-neutral-700" />
@@ -288,19 +301,17 @@ export default function Chat() {
             </div>
           )}
 
+          {/* THE INPUT BOX (GEMINI STYLE) */}
           <div className={`
-             flex items-end gap-2 bg-neutral-950 border rounded-xl p-1.5 pl-2 shadow-2xl transition-all duration-300
-             ${isListening ? "border-emerald-500/50 ring-1 ring-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.1)]" : "border-neutral-800"}
+             flex flex-col gap-2 bg-neutral-950 border rounded-2xl p-3 shadow-2xl transition-all duration-300
+             ${isListening ? "border-emerald-500/50 ring-1 ring-emerald-500/30" : "border-neutral-800"}
           `}>
             
-            <div className="pb-2"> {/* Align badge to bottom if text grows */}
-               <AgentBadge agent={selectedAgent} isOpen={showAgentMenu} onClick={() => setShowAgentMenu(!showAgentMenu)} />
-            </div>
-            
+            {/* TOP ROW: TEXT AREA */}
             <textarea
               ref={textareaRef}
               rows={1}
-              className="flex-1 bg-transparent text-white text-sm font-light px-2 py-3 outline-none placeholder:text-neutral-700 resize-none max-h-32 min-h-[40px] overflow-y-auto scrollbar-hide"
+              className="w-full bg-transparent text-white text-base font-light px-2 outline-none placeholder:text-neutral-600 resize-none max-h-48 min-h-[24px] overflow-y-auto scrollbar-hide"
               placeholder={isListening ? "Listening..." : "Message..."}
               value={input}
               onChange={(e) => {
@@ -310,44 +321,49 @@ export default function Chat() {
               }}
               onKeyDown={(e) => { 
                 if (e.key === "Enter" && !e.shiftKey && !loading) {
-                    e.preventDefault(); // Prevent default new line
+                    e.preventDefault(); 
                     handleSend(); 
                 }
               }}
               disabled={loading} 
             />
 
-            {/* ACTION BUTTONS */}
-            <div className="flex items-center gap-1 pr-1 shrink-0 pb-1"> {/* Align buttons to bottom */}
-              
-              <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
-              
-              <button onClick={() => fileInputRef.current.click()} className={`p-2 rounded-lg transition-colors hover:bg-neutral-800 ${imageBase64 ? "text-emerald-500" : "text-neutral-500"}`} title="Upload Image">
-                <ImageIcon size={18} strokeWidth={1.5} />
-              </button>
+            {/* BOTTOM ROW: TOOLS & SEND */}
+            <div className="flex items-center justify-between pt-1">
+               {/* Left: Badge */}
+               <AgentBadge agent={selectedAgent} isOpen={showAgentMenu} onClick={() => setShowAgentMenu(!showAgentMenu)} />
 
-              <button onClick={handleShare} className="p-2 rounded-lg transition-colors hover:bg-neutral-800 text-neutral-500" title="Share Last Response">
-                <Share2 size={18} strokeWidth={1.5} />
-              </button>
+               {/* Right: Actions */}
+               <div className="flex items-center gap-1">
+                  <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
+                  
+                  <button onClick={() => fileInputRef.current.click()} className={`p-2 rounded-lg transition-colors hover:bg-neutral-900 ${imageBase64 ? "text-emerald-500" : "text-neutral-500"}`} title="Upload Image">
+                    <ImageIcon size={18} strokeWidth={1.5} />
+                  </button>
 
-              <button 
-                onClick={handleMicClick} 
-                className={`
-                  p-2 rounded-lg transition-all duration-200 flex items-center justify-center w-10 h-10
-                  ${isListening ? "bg-red-500/20 text-red-500 animate-vibrate" : "hover:bg-neutral-800 text-neutral-500"}
-                `}
-              >
-                <Mic size={18} strokeWidth={isListening ? 2.5 : 1.5} />
-              </button>
+                  <button onClick={handleShare} className="p-2 rounded-lg transition-colors hover:bg-neutral-900 text-neutral-500" title="Share Last Response">
+                    <Share2 size={18} strokeWidth={1.5} />
+                  </button>
 
-              <button onClick={handleSend} disabled={(!input.trim() && !imageBase64) || loading} className={`p-2 rounded-lg transition-all duration-300 ml-1 ${(!input.trim() && !imageBase64) || loading ? "opacity-20 cursor-not-allowed" : "bg-white text-black hover:scale-105"}`}>
-                <Send size={16} strokeWidth={2} />
-              </button>
+                  <button 
+                    onClick={handleMicClick} 
+                    className={`
+                      p-2 rounded-lg transition-all duration-200 flex items-center justify-center w-10 h-10
+                      ${isListening ? "bg-red-500/20 text-red-500 animate-vibrate" : "hover:bg-neutral-900 text-neutral-500"}
+                    `}
+                  >
+                    <Mic size={18} strokeWidth={isListening ? 2.5 : 1.5} />
+                  </button>
+
+                  <button onClick={handleSend} disabled={(!input.trim() && !imageBase64) || loading} className={`p-2 rounded-lg transition-all duration-300 ml-1 ${(!input.trim() && !imageBase64) || loading ? "opacity-20 cursor-not-allowed" : "bg-white text-black hover:scale-105"}`}>
+                    <Send size={16} strokeWidth={2} />
+                  </button>
+               </div>
             </div>
           </div>
           
-          <p className="text-center text-[9px] text-neutral-700 mt-3 font-mono tracking-wide">
-             Gemini 2.5 Flash // {isListening ? <span className="text-emerald-500 animate-pulse font-bold">LISTENING...</span> : "Ready"}
+          <p className={`text-center text-[10px] text-neutral-600 mt-4 font-mono transition-opacity duration-500 ${isChatStarted ? "opacity-100" : "opacity-0"}`}>
+             Gemini 2.5 Flash // Multi-Agent
           </p>
         </div>
       </div>
