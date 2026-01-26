@@ -1,5 +1,5 @@
 import React from "react";
-import Navbar from "../components/Navbar";
+import Navbar from "../components/Navbar"; // Make sure path is correct
 
 export default function Layout({ children, activeTab, setActiveTab }) {
   return (
@@ -8,7 +8,6 @@ export default function Layout({ children, activeTab, setActiveTab }) {
       <main className="flex-1 relative flex flex-col min-h-0">
         {children}
       </main>
-      
     </div>
   );
 }

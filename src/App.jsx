@@ -1,5 +1,5 @@
-import { useState } from "react";
-import CreateAgent from "./pages/createAgent";
+import { useState } from "react"; // <--- 1. Move this to the VERY TOP
+import AgentsPage from "./pages/AgentsPage";
 import Chat from "./pages/chat";
 import Layout from "./Layouts/mainLayout";
 
@@ -14,7 +14,7 @@ export default function App() {
         </div>
       ) : (
         <div className="flex-1 h-full overflow-y-auto custom-scrollbar animate-in slide-in-from-bottom-2 duration-300">
-          <CreateAgent />
+          <AgentsPage />
         </div>
       )}
     </Layout>
