@@ -102,7 +102,6 @@ export default function Chat() {
   // Hooks
   const { isListening, liveTranscript, startListening, stopListening } = useSpeechToText();
 
-  // State to track if chat has started (for centering logic)
   const isChatStarted = messages.length > 0;
 
   useEffect(() => {
@@ -119,7 +118,6 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Auto-Resize Input
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"; 
@@ -179,7 +177,6 @@ export default function Chat() {
     setImageBase64(null);
     setImagePreview(null);
     
-    // Reset height immediately
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
     const newUserMessage = { role: "user", content: userText, imagePreview: imagePreview };
@@ -207,17 +204,7 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-black text-neutral-200 font-sans w-full max-w-5xl mx-auto relative">
-      <style>{`
-        @keyframes vibrate {
-          0% { transform: translate(0); }
-          25% { transform: translate(-2px, 2px); }
-          50% { transform: translate(0); }
-          75% { transform: translate(2px, -2px); }
-          100% { transform: translate(0); }
-        }
-        .animate-vibrate { animation: vibrate 0.2s linear infinite; }
-      `}</style>
-
+      
       {/* 1. CHAT STREAM */}
       <div className={`
         flex-1 overflow-y-auto px-4 md:px-6 py-8 space-y-10 no-scrollbar transition-all duration-500
@@ -252,13 +239,13 @@ export default function Chat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 2. DYNAMIC INPUT AREA (Centered when empty, Bottom when chatting) */}
+      {/* 2. DYNAMIC INPUT AREA */}
       <div className={`
         absolute left-0 right-0 p-4 transition-all duration-700 ease-in-out flex flex-col items-center justify-center z-30
         ${isChatStarted ? "bottom-0 bg-transparent" : "top-0 bottom-0 bg-black"}
       `}>
         
-        {/* Welcome Message (Only visible when centered/empty) */}
+        {/* Welcome Message */}
         {!isChatStarted && (
            <div className="text-center space-y-4 mb-8 animate-in fade-in zoom-in duration-700">
              <div className="relative inline-block">
@@ -349,9 +336,10 @@ export default function Chat() {
                     onClick={handleMicClick} 
                     className={`
                       p-2 rounded-lg transition-all duration-200 flex items-center justify-center w-10 h-10
-                      ${isListening ? "bg-red-500/20 text-red-500 animate-vibrate" : "hover:bg-neutral-900 text-neutral-500"}
+                      ${isListening ? "bg-red-500/20 text-red-500" : "hover:bg-neutral-900 text-neutral-500"}
                     `}
                   >
+                    {/* Visual state change only via color, no motion */}
                     <Mic size={18} strokeWidth={isListening ? 2.5 : 1.5} />
                   </button>
 
@@ -363,7 +351,7 @@ export default function Chat() {
           </div>
           
           <p className={`text-center text-[10px] text-neutral-600 mt-4 font-mono transition-opacity duration-500 ${isChatStarted ? "opacity-100" : "opacity-0"}`}>
-             Gemini 2.5 Flash // Multi-Agent
+             Gemini 2.5 Flash // {isListening ? <span className="text-emerald-500 font-bold">LISTENING...</span> : "Multi-Agent"}
           </p>
         </div>
       </div>
