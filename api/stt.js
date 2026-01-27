@@ -3,11 +3,13 @@ import formidable from "formidable";
 import fs from "fs";
 
 export const config = {
-  api: { bodyParser: false },
+  api: {
+    bodyParser: false
+  }
 };
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 export default async function handler(req, res) {
@@ -19,36 +21,41 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "OPENAI_API_KEY not set" });
   }
 
-  const form = formidable({ multiples: false });
+  try {
+    const form = formidable({
+      multiples: false,
+      keepExtensions: true
+    });
 
-  form.parse(req, async (err, fields, files) => {
-    if (err) {
-      console.error("Form parse error:", err);
-      return res.status(500).json({ error: "Form parse failed" });
-    }
+    const [fields, files] = await form.parse(req);
 
-    const audioFile =
-      files.audio?.filepath
-        ? files.audio
-        : Array.isArray(files.audio)
-        ? files.audio[0]
-        : null;
+    const audio =
+      Array.isArray(files.audio) ? files.audio[0] : files.audio;
 
-    if (!audioFile?.filepath) {
+    if (!audio?.filepath) {
       console.error("No audio file:", files);
       return res.status(400).json({ error: "No audio file received" });
     }
 
-    try {
-      const transcription = await openai.audio.transcriptions.create({
-        file: fs.createReadStream(audioFile.filepath),
-        model: "whisper-1",
-      });
+    const stream = fs.createReadStream(audio.filepath);
 
-      return res.json({ transcript: transcription.text });
-    } catch (error) {
-      console.error("Whisper error:", error);
-      return res.status(500).json({ error: "Whisper failed" });
-    }
-  });
+    const transcription = await openai.audio.transcriptions.create({
+      file: stream,
+      model: "whisper-1"
+    });
+
+    // Clean up temp file (important on Vercel)
+    fs.unlinkSync(audio.filepath);
+
+    return res.status(200).json({
+      transcript: transcription.text
+    });
+
+  } catch (err) {
+    console.error("STT ERROR:", err);
+    return res.status(500).json({
+      error: "Whisper failed",
+      details: err.message
+    });
+  }
 }
