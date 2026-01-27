@@ -15,16 +15,28 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const form = formidable();
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).json({ error: "OPENAI_API_KEY not set" });
+  }
+
+  const form = formidable({ multiples: false });
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
-      return res.status(500).json({ error: "File upload failed" });
+      console.error("Form parse error:", err);
+      return res.status(500).json({ error: "Form parse failed" });
     }
 
-    const audioFile = files.audio?.[0];
-    if (!audioFile) {
-      return res.status(400).json({ error: "No audio file" });
+    const audioFile =
+      files.audio?.filepath
+        ? files.audio
+        : Array.isArray(files.audio)
+        ? files.audio[0]
+        : null;
+
+    if (!audioFile?.filepath) {
+      console.error("No audio file:", files);
+      return res.status(400).json({ error: "No audio file received" });
     }
 
     try {
@@ -33,9 +45,10 @@ export default async function handler(req, res) {
         model: "whisper-1",
       });
 
-      res.json({ transcript: transcription.text });
+      return res.json({ transcript: transcription.text });
     } catch (error) {
-      res.status(500).json({ error: "Whisper failed" });
+      console.error("Whisper error:", error);
+      return res.status(500).json({ error: "Whisper failed" });
     }
   });
 }
