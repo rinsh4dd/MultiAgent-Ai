@@ -7,6 +7,7 @@ import { ToastProvider } from "./components/Toast.jsx";
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <ToastProvider position ="top-center">
+      
       <App />
     </ToastProvider>
   </StrictMode>,

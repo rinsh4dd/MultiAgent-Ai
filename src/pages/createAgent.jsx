@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { db } from "../firebase";
 import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
 import { processFiles } from "../utils/fileProcessor";
@@ -12,6 +12,9 @@ import {
   ArrowLeft,
   Link as LinkIcon,
   Lock,
+  Trash2,
+  Database,
+  RefreshCw,
 } from "lucide-react";
 import {
   SectionHeader,
@@ -62,6 +65,12 @@ export default function CreateAgent({ onBack, initialData = null }) {
     role: initialData?.role || "",
   });
 
+  // Knowledge Base State
+  const [knowledgeBase, setKnowledgeBase] = useState(
+    initialData?.knowledgeBase || ""
+  );
+  const [savedLinks, setSavedLinks] = useState(initialData?.savedLinks || []);
+
   const [files, setFiles] = useState([]);
   const [links, setLinks] = useState([]);
 
@@ -81,6 +90,18 @@ export default function CreateAgent({ onBack, initialData = null }) {
   const handleFileChange = (e) => {
     if (e.target.files)
       setFiles((prev) => [...prev, ...Array.from(e.target.files)]);
+  };
+
+  const handleClearKnowledge = () => {
+    if (
+      window.confirm(
+        "Are you sure? This will wipe all existing knowledge text for this agent."
+      )
+    ) {
+      setKnowledgeBase(""); // Clear the text content
+      setSavedLinks([]); // Clear the saved links list visually
+      addToast("Knowledge Base Cleared. Save to apply.", "success");
+    }
   };
 
   const fetchLinkContent = async () => {
@@ -117,12 +138,14 @@ export default function CreateAgent({ onBack, initialData = null }) {
     setLoading(true);
 
     try {
-      let finalKnowledge = initialData?.knowledgeBase || "";
+      // Start with whatever is currently in the knowledgeBase state
+      let finalKnowledge = knowledgeBase;
 
       if (files.length > 0) {
         setStatusMsg("Analyzing New Files...");
         const newFileKnowledge = await processFiles(files);
-        finalKnowledge += `\n${newFileKnowledge}`;
+        // Append new file data
+        finalKnowledge += `\n\n=== NEW FILE UPLOAD ===\n${newFileKnowledge}`;
       }
 
       if (links.length > 0) {
@@ -130,21 +153,22 @@ export default function CreateAgent({ onBack, initialData = null }) {
         const newLinkKnowledge = links
           .map((l) => `\n\n=== WEB SOURCE: ${l.url} ===\n${l.content}`)
           .join("");
+        // Append new link data
         finalKnowledge += newLinkKnowledge;
       }
 
-      const previousLinks = initialData?.savedLinks || [];
+      // Merge new links into the savedLinks array
       const newLinksList = links.map((l) => ({
         url: l.url,
         addedAt: new Date().toISOString(),
       }));
-      const updatedSavedLinks = [...previousLinks, ...newLinksList];
+      const updatedSavedLinks = [...savedLinks, ...newLinksList];
 
       const payload = {
         ...formData,
         knowledgeBase: finalKnowledge,
-        fileCount: (initialData?.fileCount || 0) + files.length,
-        linkCount: (initialData?.linkCount || 0) + links.length,
+        fileCount: (isEditing && knowledgeBase ? initialData.fileCount : 0) + files.length, // Logic: if KB cleared, reset count roughly
+        linkCount: updatedSavedLinks.length,
         savedLinks: updatedSavedLinks,
         updatedAt: new Date(),
       };
@@ -190,7 +214,7 @@ export default function CreateAgent({ onBack, initialData = null }) {
             <div>
               <h1 className="text-xl font-light text-white uppercase tracking-widest">
                 {isEditing
-                  ? `Edit Protocol: ${initialData.name}`
+                  ? `Edit Agent: ${initialData.name}`
                   : "Initialize New Agent"}
               </h1>
               <p className="text-[10px] font-mono text-neutral-500">
@@ -220,49 +244,71 @@ export default function CreateAgent({ onBack, initialData = null }) {
                   onChange={handleInputChange}
                 />
               </section>
+
+              {/* --- NEW: MANAGE EXISTING KNOWLEDGE --- */}
+              {isEditing && (
+                <section className="bg-neutral-900/30 p-5 rounded-lg border border-neutral-800">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2 text-neutral-300">
+                      <Database size={16} className="text-emerald-500" />
+                      <span className="text-xs font-bold uppercase tracking-widest">
+                        Core Neural Memory
+                      </span>
+                    </div>
+                    {knowledgeBase && (
+                      <button
+                        type="button"
+                        onClick={handleClearKnowledge}
+                        className="flex items-center gap-2 text-[10px] text-red-500 hover:text-red-400 bg-red-950/20 px-3 py-1.5 rounded border border-red-900/30 transition-colors"
+                      >
+                        <Trash2 size={12} />
+                        WIPE MEMORY
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <textarea
+                      readOnly
+                      value={
+                        knowledgeBase ||
+                        "// Memory is empty. Agent relies on base LLM knowledge."
+                      }
+                      className="w-full h-48 bg-neutral-950 text-[10px] font-mono text-neutral-400 p-4 rounded border border-neutral-800 resize-none outline-none custom-scrollbar leading-relaxed"
+                    />
+                    <div className="absolute bottom-2 right-2 text-[9px] text-neutral-600 bg-neutral-950/80 px-2 py-1 rounded">
+                      {knowledgeBase.length} chars
+                    </div>
+                  </div>
+
+                  {savedLinks.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-neutral-800/50">
+                      <p className="text-[10px] text-neutral-500 mb-2 uppercase tracking-wide">
+                        Integrated Sources:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {savedLinks.map((l, i) => (
+                          <span
+                            key={i}
+                            className="text-[10px] px-2 py-1 rounded bg-neutral-800 text-neutral-400 border border-neutral-700 truncate max-w-[200px]"
+                            title={l.url}
+                          >
+                            {l.url}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </section>
+              )}
             </div>
 
             {/* RIGHT COLUMN */}
             <div className="lg:col-span-5 flex flex-col gap-10">
-              {/* --- NEW SECTION: DISPLAY SAVED (READ-ONLY) LINKS --- */}
-              {isEditing && initialData?.savedLinks?.length > 0 && (
-                <section className="bg-neutral-900/30 p-4 rounded-lg border border-neutral-800">
-                  <div className="flex items-center gap-2 mb-3 text-neutral-400">
-                    <Lock size={12} />
-                    <span className="text-[10px] font-mono uppercase tracking-wider">
-                      Learned Sources (Read-Only)
-                    </span>
-                  </div>
-                  <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
-                    {initialData.savedLinks.map((link, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-3 p-2 bg-neutral-950 border border-neutral-800 rounded opacity-60"
-                      >
-                        <LinkIcon
-                          size={12}
-                          className="text-neutral-600 shrink-0"
-                        />
-                        <span
-                          className="text-xs font-mono text-neutral-400 truncate flex-1"
-                          title={link.url}
-                        >
-                          {link.url}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[9px] text-neutral-600 mt-2 font-mono italic">
-                    * These sources are already integrated into the knowledge
-                    base and cannot be individually removed.
-                  </p>
-                </section>
-              )}
-
               <section>
                 <SectionHeader
                   icon={FileText}
-                  title={isEditing ? "ADD MORE FILES" : "FILE KNOWLEDGE"}
+                  title={isEditing ? "APPEND FILES" : "FILE KNOWLEDGE"}
                 />
                 <FileKnowledgeSection
                   files={files}
@@ -276,7 +322,7 @@ export default function CreateAgent({ onBack, initialData = null }) {
               <section>
                 <SectionHeader
                   icon={Globe}
-                  title={isEditing ? "ADD MORE LINKS" : "WEB KNOWLEDGE"}
+                  title={isEditing ? "APPEND LINKS" : "WEB KNOWLEDGE"}
                 />
                 <WebKnowledgeSection
                   links={links}
@@ -311,7 +357,7 @@ export default function CreateAgent({ onBack, initialData = null }) {
                 {loading
                   ? statusMsg
                   : isEditing
-                    ? "UPDATE & TRAIN"
+                    ? "SAVE & RETRAIN"
                     : "DEPLOY AGENT"}
               </button>
             </div>
