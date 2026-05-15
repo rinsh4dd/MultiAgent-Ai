@@ -77,7 +77,7 @@ import pdfWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
-const MODEL_NAME = "gemini-flash-lite-latest";
+const MODEL_NAME = "gemini-2.5-flash";
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const fileToGenerativePart = async (file) => {
   const base64EncodedDataPromise = new Promise((resolve) => {
@@ -100,9 +100,11 @@ export const processFiles = async (files) => {
     let attempts = 0;
     while (attempts < 3) {
       try {
+        console.log(`AI call attempt ${attempts + 1} for prompt parts:`, promptParts);
         return await model.generateContent(promptParts);
       } catch (e) {
         attempts++;
+        console.error(`AI call failed (Attempt ${attempts}):`, e);
         // If it's a 503 (Server Busy) and we have retries left
         if (e.message.includes("503") && attempts < 3) {
           console.warn(`Model overloaded. Retrying in 2 seconds... (Attempt ${attempts})`);
@@ -114,6 +116,8 @@ export const processFiles = async (files) => {
     }
     throw new Error("AI Service is too busy. Please try again later.");
   };
+
+  console.log(`Processing ${files.length} files...`);
 
   for (const file of files) {
     const fileHeader = `\n\n=== SOURCE: ${file.name} ===\n`;

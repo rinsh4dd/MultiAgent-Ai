@@ -19,7 +19,6 @@ html {
     sans-serif;
 }
 
-
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
@@ -35,36 +34,35 @@ html {
 }
 
 @keyframes wave {
-  0% { height: 20%; }
-  50% { height: 100%; }
-  100% { height: 20%; }
+  0% {
+    height: 20%;
+  }
+  50% {
+    height: 100%;
+  }
+  100% {
+    height: 20%;
+  }
 }
 
 .animate-wave {
   animation: wave 0.9s ease-in-out infinite;
 }
 
-
-
-
 @layer base {
-  /* 1. Target EVERYTHING */
   * {
-    caret-color: transparent; /* Hides the blinking vertical line */
-    cursor: default;          /* Forces the arrow cursor (instead of the 'I' text bar) */
+    caret-color: transparent;
+    cursor: default;
   }
 
-  /* 2. EXCEPTION: Restore normal behavior for Inputs and Textareas */
-  input, 
-  textarea, 
+  input,
+  textarea,
   [contenteditable="true"] {
-    caret-color: white; /* Or 'auto' / 'black' depending on your design */
-    cursor: text;       /* Shows the 'I' bar so user knows they can type */
+    caret-color: white;
+    cursor: text;
   }
-
-  /* 3. EXCEPTION: Keep the 'Hand' cursor for clickable items */
-  button, 
-  a, 
+  button,
+  a,
   [role="button"] {
     cursor: pointer;
   }
