@@ -57,6 +57,7 @@ export default function CreateAgent({ onBack, initialData = null }) {
   });
   const [knowledgeBase, setKnowledgeBase] = useState(initialData?.knowledgeBase || "");
   const [savedLinks, setSavedLinks] = useState(initialData?.savedLinks || []);
+  const [savedFiles, setSavedFiles] = useState(initialData?.savedFiles || []);
   const [files, setFiles] = useState([]);
   const [links, setLinks] = useState([]);
   const [currentLink, setCurrentLink] = useState("");
@@ -74,6 +75,7 @@ export default function CreateAgent({ onBack, initialData = null }) {
     if (window.confirm("Initialize memory wipe? This action cannot be undone.")) {
       setKnowledgeBase("");
       setSavedLinks([]);
+      setSavedFiles([]);
       addToast("Neural memory cleared", "success");
     }
   };
@@ -106,10 +108,16 @@ export default function CreateAgent({ onBack, initialData = null }) {
 
     try {
       let finalKnowledge = knowledgeBase;
+      let newSavedFiles = [...savedFiles];
+
       if (files.length > 0) {
         setStatusMsg("Processing documents...");
-        const newFileKnowledge = await processFiles(files);
-        finalKnowledge += `\n\n=== ATTACHED_FILES ===\n${newFileKnowledge}`;
+        const processed = await processFiles(files);
+        
+        processed.forEach(pf => {
+          finalKnowledge += `\n\n=== SOURCE: ${pf.name} ===\n${pf.content}`;
+          newSavedFiles.push({ name: pf.name, addedAt: new Date().toISOString() });
+        });
       }
       if (links.length > 0) {
         setStatusMsg("Synthesizing web data...");
@@ -122,9 +130,10 @@ export default function CreateAgent({ onBack, initialData = null }) {
         ...formData,
         voiceProfile: selectedVoice,
         knowledgeBase: finalKnowledge,
-        fileCount: (isEditing ? initialData.fileCount : 0) + files.length,
+        fileCount: newSavedFiles.length,
         linkCount: updatedSavedLinks.length,
         savedLinks: updatedSavedLinks,
+        savedFiles: newSavedFiles,
         updatedAt: new Date(),
       };
 
@@ -238,7 +247,25 @@ export default function CreateAgent({ onBack, initialData = null }) {
             <div className="lg:sticky lg:top-8 space-y-8">
               <section className="bg-neutral-900/30 p-8 rounded-3xl border border-neutral-800 space-y-6">
                 <SectionHeader icon={FileText} title="Knowledge Uploads" />
-                <FileKnowledgeSection files={files} onAdd={(e) => e.target.files && setFiles(p => [...p, ...Array.from(e.target.files)])} onRemove={(i) => setFiles(p => p.filter((_, idx) => idx !== i))} />
+                <FileKnowledgeSection 
+                  files={files} 
+                  savedFiles={savedFiles}
+                  onAdd={(e) => e.target.files && setFiles(p => [...p, ...Array.from(e.target.files)])} 
+                  onRemove={(i) => setFiles(p => p.filter((_, idx) => idx !== i))}
+                  onRemoveSaved={(name) => {
+                    setSavedFiles(p => p.filter(f => f.name !== name));
+                    // Optional: Try to remove the text block from knowledgeBase
+                    const marker = `=== SOURCE: ${name} ===`;
+                    if (knowledgeBase.includes(marker)) {
+                      const parts = knowledgeBase.split(marker);
+                      // This is a simple heuristic: remove from marker until next marker or end
+                      const after = parts[1].split("=== SOURCE:")[1] || "";
+                      const before = parts[0];
+                      setKnowledgeBase(before + (after ? `=== SOURCE:${after}` : ""));
+                    }
+                    addToast(`Removed ${name} from core memory`, "success");
+                  }}
+                />
               </section>
 
               <section className="bg-neutral-900/30 p-8 rounded-3xl border border-neutral-800 space-y-6">

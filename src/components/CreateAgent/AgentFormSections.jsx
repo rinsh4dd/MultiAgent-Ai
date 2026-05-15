@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
   Link as LinkIcon,
   Eye,
+  CheckCircle2,
 } from "lucide-react";
 
 // --- ATOM: THIN INPUT (Your existing style) ---
@@ -127,13 +128,13 @@ export const BehaviourSection = ({ value, onChange }) => (
 );
 
 // --- COMPONENT: FILE KNOWLEDGE SECTION ---
-export const FileKnowledgeSection = ({ files, onAdd, onRemove }) => (
+export const FileKnowledgeSection = ({ files, savedFiles = [], onAdd, onRemove, onRemoveSaved }) => (
   <>
     <label
       className={`
       w-full min-h-[120px] border border-dashed rounded-sm cursor-pointer transition-all duration-300
       flex flex-col items-center justify-center relative overflow-hidden group mb-4
-      ${files.length > 0 ? "border-emerald-500/30 bg-emerald-950/5" : "border-neutral-800 hover:border-neutral-600 hover:bg-neutral-900/20"}
+      ${(files.length > 0 || savedFiles.length > 0) ? "border-emerald-500/30 bg-emerald-950/5" : "border-neutral-800 hover:border-neutral-600 hover:bg-neutral-900/20"}
     `}
     >
       <div className="z-10 flex flex-col items-center text-neutral-700 group-hover:text-neutral-400 transition-colors">
@@ -154,10 +155,33 @@ export const FileKnowledgeSection = ({ files, onAdd, onRemove }) => (
       />
     </label>
 
-    <div className="space-y-2 max-h-[100px] overflow-y-auto custom-scrollbar">
+    <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
+      {/* 💾 ALREADY SAVED FILES */}
+      {savedFiles.map((f, i) => (
+        <div
+          key={`saved-${i}`}
+          className="flex justify-between items-center px-2 py-2 border-b border-emerald-900/20 text-[10px] bg-emerald-500/5 rounded-md mb-1"
+        >
+          <span className="truncate max-w-[200px] flex items-center gap-2 text-emerald-400 font-medium">
+            <CheckCircle2 size={10} className="text-emerald-500" />
+            {f.name}
+            <span className="text-[8px] opacity-50 font-mono italic">SAVED</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => onRemoveSaved(f.name)}
+            className="text-neutral-600 hover:text-red-400 p-1"
+            title="Remove from memory"
+          >
+            <X size={10} />
+          </button>
+        </div>
+      ))}
+
+      {/* 📤 PENDING UPLOAD FILES */}
       {files.map((f, i) => (
         <div
-          key={i}
+          key={`pending-${i}`}
           className="flex justify-between items-center px-2 py-2 border-b border-neutral-900/50 text-[10px] text-neutral-400"
         >
           <span className="truncate max-w-[200px] flex items-center gap-2">
@@ -171,7 +195,7 @@ export const FileKnowledgeSection = ({ files, onAdd, onRemove }) => (
           <button
             type="button"
             onClick={() => onRemove(i)}
-            className="text-neutral-600 hover:text-red-400"
+            className="text-neutral-600 hover:text-red-400 p-1"
           >
             <X size={10} />
           </button>

@@ -208,7 +208,10 @@ export default function Chat() {
                       <VoiceMessage src={m.audioUrl} />
                     </div>
                   )}
-                  <FormattedMessage text={m.content} />
+                  <FormattedMessage 
+                    text={m.content} 
+                    animate={m.role === "assistant" && i === messages.length - 1} 
+                  />
                 </div>
               </div>
             ))}
